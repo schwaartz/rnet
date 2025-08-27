@@ -1,12 +1,13 @@
-mod layer; mod network;
-use crate::layer::Layer;
-use crate::network::Network;
+mod layer; mod network; mod activation;
+use crate::layer::*;
+use crate::network::*;
+use crate::activation::*;
 use ndarray::{arr1, arr2};
 
 fn main() {
     let _layer = Layer::new(
         3,
-        |x| x.tanh(),
+        |x| Sigmoid::func(x),
         arr1(&[0.0, 0.0, 0.0]),
         arr2(&[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
     );
