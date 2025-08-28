@@ -29,6 +29,9 @@ impl Network {
 
     /// Performs a backward propagation step using gradients calculated with the chain rule
     pub fn backwards_propagation(&mut self, learning_rate: f64, input: &Array1<f64>, target: &Array1<f64>) {
+        assert!(target.len() == self.layers.last().unwrap().dim);
+        assert!(input.len() == self.input_dim);
+        
         let gradients = self.calculate_gradient(input, target);
         for l in 0..self.layers.len() {
             let (grad_b, grad_w) = &gradients[l];
@@ -41,9 +44,6 @@ impl Network {
     /// Vec<(Array1<f64>, Array2<f64>)> where every first entry of the tuple are the partial derivatives
     /// of the biases and the second entry of the tuple are the partial derivatives of the weights.
     fn calculate_gradient(&self, input: &Array1<f64>, target: &Array1<f64>) -> Vec<(Array1<f64>, Array2<f64>)> {
-        assert!(target.len() == self.layers.last().unwrap().dim);
-        assert!(input.len() == self.input_dim);
-
         // We calculate the output and store all the intermediate results before
         // applying the activation functions $z^{(l)}_i$ in a list z and the results
         // after applying the activation func $a^{(l)}_i$ in a list a
@@ -144,6 +144,8 @@ impl Network {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
     use ndarray::{arr1, arr2};
     use crate::activation::Activation;
@@ -167,25 +169,41 @@ mod tests {
     }
 
     #[test]
-    fn test_network_backprop() {
-        // Create a network with three layers of dimension 2
+    fn test_network_backprop_and_gate() {
+        // Create a network with two layers, one with dimension 2 and one with dimension 1
         let layer1 = Layer::new(
-            2,
+            1,
             Activation::ReLu,
-            arr1(&[0.0, 0.0]),
-            arr2(&[[1.0, 0.0], [0.0, 1.0]]),
+            arr1(&[0.0]),
+            arr2(&[[1.0, 1.0]]),
         );
-        let layer2 = layer1.clone();
-        let mut network = Network::new(2, vec![layer1, layer2], Loss::MSE);
+        let mut network = Network::new(2, vec![layer1], Loss::MSE);
 
-        // Test whether the backpropagation changed the values accordingly
-        let input = arr1(&[1.0, 1.0]);
-        let target = arr1(&[2.0, 0.0]);
-        network.backwards_propagation(1.0, &input, &target);
+        // Create all possible input combinations for the AND gate
+        // replicating the one with output one three times to
+        // have a balanced dataset
+        let dataset = vec![
+            (arr1(&[0.0, 0.0]), arr1(&[0.0])),
+            (arr1(&[0.0, 1.0]), arr1(&[0.0])),
+            (arr1(&[1.0, 0.0]), arr1(&[0.0])),
+            (arr1(&[1.0, 1.0]), arr1(&[1.0])),
+            (arr1(&[1.0, 1.0]), arr1(&[1.0])),
+            (arr1(&[1.0, 1.0]), arr1(&[1.0])),
+        ];
 
-        // We know that this will output [1.0, 1.0], so we know that the bias of the
-        // first neuron in the output layer should have increased. The other weights
-        // and biases are a lot more complicated.
-        assert!(network.layers[1].bias[0] > 0.0);
+        // Learn the AND gate
+        let runs = 10;
+        for _ in 0..runs {
+            for (input, target) in &dataset {
+                network.backwards_propagation(0.1, input, target);
+            }
+        }
+
+        // Test the forward propagation after training
+        for (input, target) in &dataset {
+            let test_output = network.forward_prop(&input);
+            println!("Input: {:?}, Output: {:?}", input, test_output);
+            assert!(test_output[0].round() == target[0]);
+        }
     }
 }
