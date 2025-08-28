@@ -40,8 +40,6 @@ impl Activation {
 
 #[cfg(test)]
 mod tests{
-    use crate::activation;
-
     use super::*;
 
     #[test]

@@ -1,6 +1,6 @@
 use ndarray::{Array1, Array2};
 
-use crate::activation::Activation;
+use crate::rnet::activation::Activation;
 
 /// The Layer struct structs represents any (non-input) layer in a NN
 /// Input layers do not require weights or a `calculate` function or a bias

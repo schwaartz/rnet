@@ -1,6 +1,6 @@
 use ndarray::{Array1, Array2};
-use crate::layer::Layer;
-use crate::loss::Loss;
+use crate::rnet::layer::Layer;
+use crate::rnet::loss::Loss;
 
 /// The Network struct implements a simple neural network
 pub struct Network {
@@ -148,7 +148,7 @@ mod tests {
 
     use super::*;
     use ndarray::{arr1, arr2};
-    use crate::activation::Activation;
+    use crate::rnet::activation::Activation;
 
     #[test]
     fn test_network_forward() {

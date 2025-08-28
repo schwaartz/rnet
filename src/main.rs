@@ -1,5 +1,14 @@
+#![allow(dead_code)]
+
 mod rnet;
-use crate::rnet::*;
+
+use rnet::layer::*;
+use rnet::network::*;
+use rnet::activation::*;
+use rnet::loss::*;
+use rnet::data::*;
+use rnet::rnet::*;
+
 use ndarray::{arr1, arr2};
 
 fn main() {
