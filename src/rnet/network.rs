@@ -27,17 +27,28 @@ impl Network {
         output
     }
 
-    /// Performs a backward propagation step using gradients calculated with the chain rule
-    pub fn backwards_propagation(&mut self, learning_rate: f64, input: &Array1<f64>, target: &Array1<f64>) {
-        assert!(target.len() == self.layers.last().unwrap().dim);
-        assert!(input.len() == self.input_dim);
-        
-        let gradients = self.calculate_gradient(input, target);
-        for l in 0..self.layers.len() {
-            let (grad_b, grad_w) = &gradients[l];
-            self.layers[l].bias = &self.layers[l].bias - learning_rate * grad_b;
-            self.layers[l].weights = &self.layers[l].weights - learning_rate * grad_w;
+    /// Performs backward propagation using gradients calculated with the chain rule.
+    /// It updates the weights and biases of the network based on the given inputs and targets batch.
+    pub fn backwards_propagation(&mut self, learning_rate: f64, inputs: &Vec<&Array1<f64>>, targets: &Vec<&Array1<f64>>) {
+        assert!(targets.len() == inputs.len());
+        let mut new_layers = self.layers.clone();
+        let n = inputs.len();
+
+        for i in 0..inputs.len() {
+            let (input, target) = (&inputs[i], &targets[i]);
+            assert!(target.len() == self.layers.last().unwrap().dim);
+            assert!(input.len() == self.input_dim);
+
+            // Calculate the gradient for the given batch with $\frac{1}{N} \nu \ * \sum_{i=1}^{N} \grad C_i$
+            let gradients = self.calculate_gradient(input, target);
+            for l in 0..self.layers.len() {
+                let (grad_b, grad_w) = &gradients[l];
+                new_layers[l].bias = &new_layers[l].bias - learning_rate * grad_b * (1.0 / n as f64);
+                new_layers[l].weights = &new_layers[l].weights - learning_rate * grad_w * (1.0 / n as f64);
+            }
         }
+
+        self.layers = new_layers;
     }
 
     /// Calculates the gradient for each of the layers of the network in the format
@@ -195,7 +206,7 @@ mod tests {
         let runs = 10;
         for _ in 0..runs {
             for (input, target) in &dataset {
-                network.backwards_propagation(0.1, input, target);
+                network.backwards_propagation(0.1, &vec![&input], &vec![&target]);
             }
         }
 

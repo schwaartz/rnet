@@ -49,9 +49,11 @@ impl Layer {
         let z = self.weights.dot(input) + &self.bias;
         z
     }
+}
 
+impl Clone for Layer {
     /// Clones the layer
-    pub fn clone(&self) -> Self {
+    fn clone(&self) -> Self {
         Layer {
             dim: self.dim,
             activation: self.activation,

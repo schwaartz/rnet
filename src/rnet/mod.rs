@@ -3,4 +3,4 @@ pub mod network;
 pub mod activation;
 pub mod loss;
 pub mod data;
-pub mod rnet;
+pub mod train;
