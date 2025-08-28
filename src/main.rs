@@ -1,8 +1,5 @@
-mod layer; mod network; mod activation; mod loss;
-use crate::layer::*;
-use crate::network::*;
-use crate::activation::*;
-use crate::loss::*;
+mod rnet;
+use crate::rnet::*;
 use ndarray::{arr1, arr2};
 
 fn main() {
