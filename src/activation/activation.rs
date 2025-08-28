@@ -4,6 +4,7 @@
 pub enum Activation {
     Sigmoid,
     Tanh,
+    ReLu,
 }
 
 impl Activation {
@@ -11,6 +12,7 @@ impl Activation {
         match self {
             Activation::Sigmoid => 1.0 / (1.0 + (-x).exp()),
             Activation::Tanh => x.tanh(),
+            Activation::ReLu => x.max(0.0),
         }
     }
 
@@ -23,6 +25,13 @@ impl Activation {
             Activation::Tanh => {
                 let t = x.tanh();
                 1.0 - t * t
+            }
+            Activation::ReLu => {
+                if x > 0.0 {
+                    1.0
+                } else {
+                    0.0
+                }
             }
         }
     }
@@ -61,5 +70,19 @@ mod tests{
         let activation = Activation::Tanh;
         assert_eq!(activation.derivative(0.0), 1.0);
         assert_eq!(activation.derivative(1.0), 0.41997434161402614);
+    }
+
+    #[test]
+    fn test_relu() {
+        let activation = Activation::ReLu;
+        assert_eq!(activation.func(0.0), 0.0);
+        assert_eq!(activation.func(1.0), 1.0);
+    }
+
+    #[test]
+    fn test_relu_derivative() {
+        let activation = Activation::ReLu;
+        assert_eq!(activation.derivative(0.0), 0.0);
+        assert_eq!(activation.derivative(1.0), 1.0);
     }
 }
