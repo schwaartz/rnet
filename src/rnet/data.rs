@@ -5,6 +5,7 @@ use rand::{SeedableRng, rngs::StdRng};
 const RANDSEED: u64 = 0;
 
 /// A struct that represents a dataset for training a neural network
+#[derive(Debug, Clone)]
 pub struct Dataset {
     pub inputs: Vec<Array1<f64>>,
     pub targets: Vec<Array1<f64>>,
@@ -14,7 +15,7 @@ pub struct Dataset {
 impl Dataset {
     /// Creates a new Dataset
     pub fn new(inputs: Vec<Array1<f64>>, targets: Vec<Array1<f64>>) -> Self {
-        assert!(inputs.len() == targets.len());
+        assert!(inputs.len() == targets.len(), "Inputs len {} != Targets len {}", inputs.len(), targets.len());
         Dataset { inputs, targets, randseed: RANDSEED }
     }
 

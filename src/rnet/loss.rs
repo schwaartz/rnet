@@ -1,6 +1,7 @@
 use ndarray::Array1;
 
 /// Represents the different loss functions available
+#[derive(Debug, Clone)]
 pub enum Loss {
     MSE,
     CrossEntropy,

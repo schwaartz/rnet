@@ -1,7 +1,7 @@
 use ndarray::Array1;
 
 /// An enum representing different types of activation functions
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Activation {
     Sigmoid,
     Tanh,
@@ -52,6 +52,7 @@ impl Activation {
 /// the softmax function to the output layer if you are certain that the
 /// network is designed to work with it (e.g., for multi-class classification
 /// where the loss function is cross-entropy, see src/rnet/loss.rs).
+#[derive(Debug, Clone)]
 pub enum OutputActivation {
     Softmax,
     None,

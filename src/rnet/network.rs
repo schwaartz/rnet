@@ -4,6 +4,7 @@ use crate::rnet::loss::Loss;
 use crate::rnet::data::Dataset;
 
 /// The Network struct implements a simple neural network
+#[derive(Debug, Clone)]
 pub struct Network {
     pub input_dim: usize,
     pub layers: Vec<Layer>,
@@ -32,7 +33,7 @@ impl Network {
     /// number of epochs, and learning rate.
     pub fn train(
         &mut self,
-        data: Dataset,
+        data: &Dataset,
         batch_size: usize,
         epochs: usize,
         learn_rate: f64,
@@ -58,14 +59,14 @@ impl Network {
     /// Performs backward propagation using gradients calculated with the chain rule.
     /// It updates the weights and biases of the network based on the given inputs and targets batch.
     pub fn backwards_propagation(&mut self, learning_rate: f64, inputs: &Vec<&Array1<f64>>, targets: &Vec<&Array1<f64>>) {
-        assert!(targets.len() == inputs.len());
+        assert!(targets.len() == inputs.len(), "Targets len {} != Inputs len {}", targets.len(), inputs.len());
         let mut new_layers = self.layers.clone();
         let n = inputs.len();
 
         for i in 0..inputs.len() {
             let (input, target) = (&inputs[i], &targets[i]);
-            assert!(target.len() == self.layers.last().unwrap().dim);
-            assert!(input.len() == self.input_dim);
+            assert!(target.len() == self.layers.last().unwrap().dim, "Target len {} != {}", target.len(), self.layers.last().unwrap().dim);
+            assert!(input.len() == self.input_dim, "Input len {} != {}", input.len(), self.input_dim);
 
             // Calculate the gradient for the given batch with $\frac{1}{N} \nu \ * \sum_{i=1}^{N} \grad C_i$
             let gradients = self.calculate_gradient(input, target);
@@ -105,7 +106,9 @@ impl Network {
             grad_output.push((grad_b, grad_w));
 
             // Calculation of then new gradient on the current layer: $\partial C / \partial a^{(l)}$
-            grad_a = self.calculate_new_a_gradient(l, &z, &grad_a);
+            if l > 0 {
+                grad_a = self.calculate_a_gradient(l - 1, &z, &grad_a);
+            }
         }
 
         grad_output.reverse();
@@ -140,12 +143,12 @@ impl Network {
     ) -> Array2<f64> {
         let layer = &self.layers[l];
         let mut grad_w = Array2::<f64>::zeros(layer.weights.dim());
-        for k in 0..layer.weights.nrows() {
-            for j in 0..layer.weights.ncols() {
-                grad_w[[k, j]] = if l > 0 {
-                    a[l-1][j] * layer.activation.derivative(z[l][k]) * grad_a[k]
+        for j in 0..layer.weights.nrows() {
+            for k in 0..layer.weights.ncols() {
+                grad_w[[j, k]] = if l > 0 {
+                    a[l-1][k] * layer.activation.derivative(z[l][j]) * grad_a[j]
                 } else {
-                    input[j] * layer.activation.derivative(z[l][k]) * grad_a[k]
+                    input[k] * layer.activation.derivative(z[l][j]) * grad_a[j]
                 };
             }
         }
@@ -165,7 +168,7 @@ impl Network {
 
     /// Private function to help calculate the new a gradient for a given layer.
     /// This function computes $\partial C / \partial a^{(l)}$ using the chain rule.
-    fn calculate_new_a_gradient(&self, l: usize, z: &Vec<Array1<f64>>, grad_a: &Array1<f64>) -> Array1<f64> {
+    fn calculate_a_gradient(&self, l: usize, z: &Vec<Array1<f64>>, grad_a: &Array1<f64>) -> Array1<f64> {
         let layer = &self.layers[l];
         let mut new_grad_a = Array1::<f64>::zeros(layer.dim);
             for k in 0..layer.dim {
@@ -241,7 +244,6 @@ mod tests {
         // Test the forward propagation after training
         for (input, target) in &dataset {
             let test_output = network.forward_prop(&input);
-            println!("Input: {:?}, Output: {:?}", input, test_output);
             assert!(test_output[0].round() == target[0]);
         }
     }

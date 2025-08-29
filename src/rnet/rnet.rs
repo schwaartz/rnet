@@ -17,12 +17,13 @@ const DEFAULT_EPOCHS: usize = 10;
 /// Represents an RNet neural network instance.
 /// It encapsulates the network architecture, training parameters, and other
 /// relevant information for training, testing and general usage.
+#[derive(Debug, Clone)]
 pub struct RNet {
-    network: Network,
-    learning_rate: f64,
-    batch_size: usize,
-    epochs: usize,
-    output_activation: OutputActivation,
+    pub network: Network,
+    pub learning_rate: f64,
+    pub batch_size: usize,
+    pub epochs: usize,
+    pub output_activation: OutputActivation,
 }
 
 impl RNet {
@@ -43,7 +44,7 @@ impl RNet {
                 shape[i],
                 activations[i - 1],
                 Self::rand_bias(shape[i]),
-                Self::rand_weights(shape[i - 1], shape[i]),
+                Self::rand_weights(shape[i], shape[i - 1]),
             ));
         }
 
@@ -75,7 +76,7 @@ impl RNet {
                 shape[i],
                 activations[i - 1],
                 Self::rand_bias(shape[i]),
-                Self::rand_weights(shape[i - 1], shape[i]),
+                Self::rand_weights(shape[i], shape[i - 1]),
             ));
         }
 
@@ -89,13 +90,8 @@ impl RNet {
     }
 
     /// Trains the neural network on the provided training data
-    pub fn train(&mut self, data: Dataset) {
+    pub fn train(&mut self, data: &Dataset) {
         self.network.train(data, self.batch_size, self.epochs, self.learning_rate);
-    }
-
-    /// Evaluates the neural network on the provided test data and returns an evaluation object
-    pub fn evaluate(&self, data: Dataset) -> f64 {
-        unimplemented!();
     }
 
     /// Makes a prediction using the trained neural network

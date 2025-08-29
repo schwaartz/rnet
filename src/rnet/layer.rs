@@ -5,6 +5,7 @@ use crate::rnet::activation::Activation;
 /// The Layer struct structs represents any (non-input) layer in a NN
 /// Input layers do not require weights or a `calculate` function or a bias
 /// as they only receive input data.
+#[derive(Debug, Clone)]
 pub struct Layer {
     pub dim: usize,
     pub activation: Activation,
@@ -31,9 +32,9 @@ impl Layer {
     /// Calculates the output a of the layer given the outputs of the previous layer (input vector).
     /// It also checks whether or not the input size matches the weight matrix and the bias in advance.
     pub fn calculate_output(&self, input: &Array1<f64>) -> Array1<f64> {
-        assert!(input.len() == self.weights.ncols());
-        assert!(self.weights.nrows() == self.dim);
-        assert!(self.bias.len() == self.dim);
+        assert!(input.len() == self.weights.ncols(), "Input len {} != {}", input.len(), self.weights.ncols());
+        assert!(self.weights.nrows() == self.dim, "Weights rows {} != {}", self.weights.nrows(), self.dim);
+        assert!(self.bias.len() == self.dim, "Bias len {} != {}", self.bias.len(), self.dim);
 
         let z = self.weights.dot(input) + &self.bias;
         z.mapv(|x| self.activation.func(x))
@@ -42,24 +43,12 @@ impl Layer {
     /// Calculates the output z of the layer without applying the activation function.
     /// This is useful for calculating the gradients during backpropagation
     pub fn calculate_output_no_activation(&self, input: &Array1<f64>) -> Array1<f64> {
-        assert!(input.len() == self.weights.ncols());
-        assert!(self.weights.nrows() == self.dim);
-        assert!(self.bias.len() == self.dim);
+        assert!(input.len() == self.weights.ncols(), "Input len {} != {}", input.len(), self.weights.ncols());
+        assert!(self.weights.nrows() == self.dim, "Weights rows {} != {}", self.weights.nrows(), self.dim);
+        assert!(self.bias.len() == self.dim, "Bias len {} != {}", self.bias.len(), self.dim);
 
         let z = self.weights.dot(input) + &self.bias;
         z
-    }
-}
-
-impl Clone for Layer {
-    /// Clones the layer
-    fn clone(&self) -> Self {
-        Layer {
-            dim: self.dim,
-            activation: self.activation,
-            bias: self.bias.clone(),
-            weights: self.weights.clone(),
-        }
     }
 }
 
