@@ -1,3 +1,4 @@
+use ndarray::Array1;
 
 /// An enum representing different types of activation functions
 #[derive(Clone, Copy)]
@@ -36,6 +37,26 @@ impl Activation {
         }
     }
 }
+
+/// An enum representing different types of output activation functions
+pub enum OutputActivation {
+    Softmax,
+}
+
+impl OutputActivation {
+    /// Applies the activation function to the input array.
+    pub fn func(&self, x: Array1<f64>) -> Array1<f64> {
+        match self {
+            OutputActivation::Softmax => {
+                let exp_x = x.mapv(|v| v.exp());
+                let sum = exp_x.sum();
+                exp_x / sum
+            }
+        }
+    }
+}
+
+
 
 
 #[cfg(test)]
@@ -82,5 +103,13 @@ mod tests{
         let activation = Activation::ReLu;
         assert_eq!(activation.derivative(0.0), 0.0);
         assert_eq!(activation.derivative(1.0), 1.0);
+    }
+
+    #[test]
+    fn test_softmax() {
+        let output_activation = OutputActivation::Softmax;
+        let input = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let expected = Array1::from_vec(vec![0.09003057317038046, 0.24472847105479767, 0.6652409557748219]);
+        assert_eq!(output_activation.func(input), expected);
     }
 }
