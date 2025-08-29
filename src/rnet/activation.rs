@@ -38,7 +38,15 @@ impl Activation {
     }
 }
 
-/// An enum representing different types of output activation functions
+/// An enum representing different types of output activation functions.
+/// This only needs to be applied to the output layer of networks that assume
+/// a specific distribution of the output (e.g., softmax for multi-class classification).
+/// NOTE: Just, applying the softmax function willy nilly to the output layer of any
+/// network is not a good idea, as it invalidates the gradient computation, which
+/// can lead to incorrect weight updates and poor performance. Only apply
+/// the softmax function to the output layer if you are certain that the
+/// network is designed to work with it (e.g., for multi-class classification
+/// where the loss function is cross-entropy, see src/rnet/loss.rs).
 pub enum OutputActivation {
     Softmax,
 }
