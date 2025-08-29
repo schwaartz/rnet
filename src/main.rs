@@ -7,7 +7,7 @@ use rnet::network::*;
 use rnet::activation::*;
 use rnet::loss::*;
 use rnet::data::*;
-use rnet::train::*;
+use rnet::test::*;
 
 use ndarray::{arr1, arr2};
 

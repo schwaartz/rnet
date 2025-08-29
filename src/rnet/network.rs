@@ -1,6 +1,7 @@
 use ndarray::{Array1, Array2};
 use crate::rnet::layer::Layer;
 use crate::rnet::loss::Loss;
+use crate::rnet::data::Dataset;
 
 /// The Network struct implements a simple neural network
 pub struct Network {
@@ -25,6 +26,33 @@ impl Network {
             output = layer.calculate_output(&output);
         }
         output
+    }
+
+    /// Trains the given neural network using the provided dataset, batch size,
+    /// number of epochs, and learning rate.
+    pub fn train(
+        &mut self,
+        data: Dataset,
+        batch_size: usize,
+        epochs: usize,
+        learn_rate: f64,
+    ) {
+        for _ in 0..epochs {
+            let (mut inputs, mut targets) = (
+                Vec::<&Array1<f64>>::new(),
+                Vec::<&Array1<f64>>::new()
+            );
+            for (input, target) in data.random_iterator() {
+                inputs.push(input);
+                targets.push(target);
+                if inputs.len() >= batch_size {
+                    self.backwards_propagation(learn_rate, &inputs, &targets);
+                    inputs.clear();
+                    targets.clear();
+                }
+            }
+            self.backwards_propagation(learn_rate, &inputs, &targets);
+        }
     }
 
     /// Performs backward propagation using gradients calculated with the chain rule.

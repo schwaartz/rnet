@@ -6,6 +6,7 @@ pub enum Activation {
     Sigmoid,
     Tanh,
     ReLu,
+    None,
 }
 
 impl Activation {
@@ -14,6 +15,7 @@ impl Activation {
             Activation::Sigmoid => 1.0 / (1.0 + (-x).exp()),
             Activation::Tanh => x.tanh(),
             Activation::ReLu => x.max(0.0),
+            Activation::None => x,
         }
     }
 
@@ -34,6 +36,9 @@ impl Activation {
                     0.0
                 }
             }
+            Activation::None => {
+                1.0
+            }
         }
     }
 }
@@ -49,6 +54,7 @@ impl Activation {
 /// where the loss function is cross-entropy, see src/rnet/loss.rs).
 pub enum OutputActivation {
     Softmax,
+    None,
 }
 
 impl OutputActivation {
@@ -60,6 +66,7 @@ impl OutputActivation {
                 let sum = exp_x.sum();
                 exp_x / sum
             }
+            OutputActivation::None => x,
         }
     }
 }
