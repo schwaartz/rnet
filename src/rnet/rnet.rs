@@ -1,5 +1,3 @@
-use std::mem::uninitialized;
-
 use crate::rnet::activation::Activation;
 use crate::rnet::activation::OutputActivation;
 use crate::rnet::network::Network;
@@ -119,6 +117,44 @@ impl RNet {
     /// Sets the number of training epochs (otherwise default)
     pub fn set_epochs(&mut self, epochs: usize) {
         self.epochs = epochs;
+    }
+
+    /// Computes the mean squared errors between the network's predictions and the target outputs
+    /// and returns the average error.
+    pub fn mean_squared_error(&self, dataset: &Dataset) -> f64 {
+        let mut squared_errors = vec![0.0; dataset.len()];
+        for (input, target) in dataset.iterator() {
+            let test_output = self.network.forward_prop(&input);
+            squared_errors.push(
+                (test_output - target).mapv(|x| x.powi(2) / target.len() as f64).sum()
+            );
+        }
+        squared_errors.iter().sum::<f64>() / squared_errors.len() as f64
+    }
+
+    /// Calculates the accuracy of the network.
+    /// This function assumes that the network is used for classification.
+    /// Calling this function on a non-classifier network.
+    pub fn accuracy(&self, dataset: &Dataset) -> f64 {
+        let get_max = |arr: &Array1<f64>| {
+            arr.iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .map(|(idx, _)| idx)
+                .unwrap()
+        };
+        let mut correct_predictions = 0;
+        let mut total_predictions = 0;
+        for (input, target) in dataset.iterator() {
+            let test_output = self.network.forward_prop(&input);
+            let predicted_class = get_max(&test_output);
+            let actual_class = get_max(&target);
+            if predicted_class == actual_class {
+                correct_predictions += 1;
+            }
+            total_predictions += 1;
+        }
+        correct_predictions as f64 / total_predictions as f64
     }
 
     /// Generates a random bias vector
