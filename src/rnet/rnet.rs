@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufWriter, Write};
 use std::error::Error;
 
 use crate::rnet::activation::Activation;
@@ -128,25 +128,40 @@ impl RNet {
     /// This function assumes that the network is used for classification.
     /// Calling this function on a non-classifier network.
     pub fn accuracy(&self, dataset: &Dataset) -> f64 {
-        let get_max = |arr: &Array1<f64>| {
-            arr.iter()
-                .enumerate()
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-                .map(|(idx, _)| idx)
-                .unwrap()
+        let get_max = |arr: &Array1<f64>| -> Option<usize> {
+            let mut max_idx = None;
+            let mut max_val = None;
+            for (i, &val) in arr.iter().enumerate() {
+                if val > max_val.unwrap_or(f64::MIN) {
+                    max_val = Some(val);
+                    max_idx = Some(i);
+                }
+            }
+            if max_val == None {
+                println!("Warning: No valid maximum found");
+            }
+            max_idx
         };
-        let mut correct_predictions = 0;
-        let mut total_predictions = 0;
+        let mut correct_predictions = 0.0;
+        let mut total_predictions = 0.0;
         for (input, target) in dataset.iterator() {
             let test_output = self.network.forward_prop(&input);
-            let predicted_class = get_max(&test_output);
-            let actual_class = get_max(&target);
+            println!("test_output: {:?}", test_output);
+            println!("target: {:?}", target);
+            let predicted_class = match get_max(&test_output) {
+                Some(idx) => idx,
+                None => continue,
+            };
+            let actual_class = match get_max(&target) {
+                Some(idx) => idx,
+                None => continue,
+            };
             if predicted_class == actual_class {
-                correct_predictions += 1;
+                correct_predictions += 1.0;
             }
-            total_predictions += 1;
+            total_predictions += 1.0;
         }
-        correct_predictions as f64 / total_predictions as f64
+        correct_predictions / total_predictions
     }
 
     /// Saves the RNnet weights to a file
@@ -156,18 +171,22 @@ impl RNet {
         for (i, layer) in self.network.layers.iter().enumerate() {
             writeln!(writer, "\n Layer {}, Activation {:?}", i, layer.activation)?;
             writeln!(writer, "Biases:")?;
+            writeln!(writer, "[")?;
             for b in layer.bias.iter() {
-                writeln!(writer, "B {}", b)?;
+                writeln!(writer, "{}", b)?;
             }
+            writeln!(writer, "]")?;
             writeln!(writer, "Weights:")?;
+            writeln!(writer, "[")?;
             for row in 0..layer.weights.nrows() {
                 let row_str = layer.weights.row(row).iter()
                     .map(|w| w.to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
-                writeln!(writer, "W {}", row_str)?;
+                writeln!(writer, "[{}]", row_str)?;
             }
-        };
+            writeln!(writer, "]")?;
+        }
         Ok(())
     }
 
@@ -184,3 +203,34 @@ impl RNet {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::*;
+
+    #[test]
+    fn test_accuracy() {
+        let inputs = vec![
+            arr1(&[1.0, 0.0, 0.0]),
+            arr1(&[0.0, 1.0, 0.0]),
+            arr1(&[0.0, 0.0, 1.0]),
+        ];
+        let dataset = Dataset::new(inputs, vec![
+            arr1(&[1.0, 0.0]),
+            arr1(&[0.0, 1.0]),
+            arr1(&[1.0, 0.0]),
+        ]);
+
+        let weights = arr2(&[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]);
+        let biases = arr1(&[100.0, 0.0]);
+        let mut rnet = RNet::new(
+            vec![3, 2],
+            vec![Activation::None, Activation::None],
+            UseCase::Classification,
+        );
+        rnet.network.layers[0].weights = weights;
+        rnet.network.layers[0].bias = biases;
+
+        assert_eq!(rnet.accuracy(&dataset), 2.0 / 3.0);
+    }
+}

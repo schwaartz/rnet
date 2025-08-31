@@ -36,14 +36,24 @@ fn main() {
     }
 
     let dataset = Dataset::new(images, labels);
+    // let dataset = dataset.split(0.05).1; // remove 90%
     let (train_dataset, test_dataset) = dataset.split(0.8);
 
     let activations = vec![Activation::ReLu, Activation::ReLu, Activation::None]; // The last layer will get softmaxed anyways
     let mut rnet = RNet::new(vec![28*28, 128, 10], activations, UseCase::Classification);
+
     rnet.set_learning_rate(0.1);
-    rnet.set_epochs(10);
+    rnet.set_epochs(1);
     rnet.set_batch_size(32);
     rnet.train(&train_dataset);
+
+    let save_file_path = format!("{}/saves/weights_1.txt", std::env::current_dir().unwrap().display());
+    if let Some(parent) = std::path::Path::new(&save_file_path).parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).unwrap();
+        }
+    }
+    rnet.save_weights(&save_file_path).unwrap();
 
     let accuracy = rnet.accuracy(&test_dataset);
     println!("Test accuracy: {}", accuracy);
