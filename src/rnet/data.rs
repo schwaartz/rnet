@@ -41,4 +41,30 @@ impl Dataset {
     pub fn set_randseed(&mut self, seed: u64) {
         self.randseed = seed;
     }
+
+    /// Splits off a percentage of the dataset into a new dataset randomly
+    /// and returns the the new datasets.
+    /// E.g. if the ratio is set to 0.8, then the first dataset will contain
+    /// 80% of the original dataset, and the second dataset will contain 20%.
+    pub fn split(&self, ratio: f64) -> (Self, Self) {
+        assert!(ratio > 0.0 && ratio < 1.0, "Invalid split ratio: {}", ratio);
+
+        let iter = self.random_iterator();
+        let remaining = (self.len() as f64 * (1.0 - ratio)).round() as usize;
+
+        let mut remaining_inputs = Vec::new();
+        let mut remaining_targets = Vec::new();
+        let mut other_inputs = Vec::new();
+        let mut other_targets = Vec::new();
+        for (input, target) in iter {
+            if remaining_inputs.len() < remaining {
+                remaining_inputs.push(input.clone());
+                remaining_targets.push(target.clone());
+            } else {
+                other_inputs.push(input.clone());
+                other_targets.push(target.clone());
+            }
+        }
+        (Dataset::new(remaining_inputs, remaining_targets), Dataset::new(other_inputs, other_targets))
+    }
 }

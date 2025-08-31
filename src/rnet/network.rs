@@ -38,21 +38,38 @@ impl Network {
         epochs: usize,
         learn_rate: f64,
     ) {
-        for _ in 0..epochs {
+        for epoch in 1..=epochs {
+            println!("Training epoch: {}", epoch);
             let (mut inputs, mut targets) = (
                 Vec::<&Array1<f64>>::new(),
                 Vec::<&Array1<f64>>::new()
             );
+            let total = data.inputs.len();
+            let mut processed = 0;
+            let mut last_progress = 0;
             for (input, target) in data.random_iterator() {
                 inputs.push(input);
                 targets.push(target);
+                processed += 1;
                 if inputs.len() >= batch_size {
                     self.backwards_propagation(learn_rate, &inputs, &targets);
                     inputs.clear();
                     targets.clear();
                 }
+                // Print progress bar every 1%
+                let progress = (processed * 100) / total;
+                if progress >= last_progress + 1 || processed == total {
+                    let bar_len = 30;
+                    let filled = (progress * bar_len) / 100;
+                    let bar: String = "#".repeat(filled) + &"-".repeat(bar_len - filled);
+                    print!("\r[{}] {}%", bar, progress);
+                    use std::io::Write;
+                    std::io::stdout().flush().unwrap();
+                    last_progress = progress;
+                }
             }
             self.backwards_propagation(learn_rate, &inputs, &targets);
+            println!("\r[{}] 100%", "#".repeat(30));
         }
     }
 
