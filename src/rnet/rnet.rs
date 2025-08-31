@@ -14,6 +14,17 @@ const DEFAULT_LEARNING_RATE: f64 = 0.001;
 const DEFAULT_BATCH_SIZE: usize = 32;
 const DEFAULT_EPOCHS: usize = 10;
 
+/// Represents the use case for an RNet neural network
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UseCase {
+    /// A use case for classification tasks. This will use cross-entropy loss and softmax output activation
+    Classification,
+    /// A use case for regression tasks. This will use mean squared error loss and no output activation
+    Regression,
+    /// A default use case. This will use mean squared error loss and no output activation
+    Default,
+}
+
 /// Represents an RNet neural network instance.
 /// It encapsulates the network architecture, training parameters, and other
 /// relevant information for training, testing and general usage.
@@ -24,13 +35,13 @@ pub struct RNet {
     pub batch_size: usize,
     pub epochs: usize,
     pub output_activation: OutputActivation,
+    pub use_case: UseCase,
 }
 
 impl RNet {
-    /// Generates a new RNet instance with a default neural network architecture.
-    /// The default architecture has a shape given by the `shape` argument, activation
-    /// functions given by the `activations` argument and it has a mean squared error loss function.
-    pub fn new_default_nn(shape: Vec<usize>, activations: Vec<Activation>) -> Self {
+    /// Generates a new RNet instance with the given architecture. The loss function
+    /// and the output activation functions are chosen based on the use case.
+    pub fn new(shape: Vec<usize>, activations: Vec<Activation>, use_case: UseCase) -> Self {
         assert!(shape.len() >= 2);
         assert!(shape.len() == activations.len() + 1);
         for dim in shape.iter() {
@@ -48,44 +59,25 @@ impl RNet {
             ));
         }
 
+        let loss = match use_case {
+            UseCase::Classification => Loss::CrossEntropy,
+            UseCase::Regression => Loss::MSE,
+            UseCase::Default => Loss::MSE,
+        };
+
+        let output_activation = match use_case {
+            UseCase::Classification => OutputActivation::Softmax,
+            UseCase::Regression => OutputActivation::None,
+            UseCase::Default => OutputActivation::None,
+        };
+
         RNet {
-            network: Network::new(shape[0], layers, Loss::MSE),
+            network: Network::new(shape[0], layers, loss),
             learning_rate: DEFAULT_LEARNING_RATE,
             batch_size: DEFAULT_BATCH_SIZE,
             epochs: DEFAULT_EPOCHS,
-            output_activation: OutputActivation::None,
-        }
-    }
-
-    /// Generates a new RNet instance with a default classifier neural network architecture.
-    /// The default architecture has a shape specified by the `shape` argument, activation
-    /// functions given by the `activations` argument and it has a cross-entropy loss function.
-    /// The size of the activations vector is 2 smaller than the shape, since the first layer
-    /// has no activation and the last layer uses softmax.
-    pub fn new_classifier_nn(shape: Vec<usize>, activations: Vec<Activation>) -> Self {
-        assert!(shape.len() >= 2);
-        assert!(shape.len() == activations.len() + 2);
-        for dim in shape.iter() {
-            assert!(*dim > 0);
-        }
-
-        // Define all the layers, except for the input layer
-        let mut layers = Vec::new();
-        for i in 1..shape.len() {
-            layers.push(Layer::new(
-                shape[i],
-                activations[i - 1],
-                Self::rand_bias(shape[i]),
-                Self::rand_weights(shape[i], shape[i - 1]),
-            ));
-        }
-
-        RNet {
-            network: Network::new(shape[0], layers, Loss::CrossEntropy),
-            learning_rate: DEFAULT_LEARNING_RATE,
-            batch_size: DEFAULT_BATCH_SIZE,
-            epochs: DEFAULT_EPOCHS,
-            output_activation: OutputActivation::Softmax,
+            output_activation,
+            use_case,
         }
     }
 

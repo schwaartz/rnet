@@ -9,7 +9,7 @@ use rnet::*;
 use ndarray::arr1;
 
 fn main() {
-    let mut rnet = RNet::new_default_nn(vec![4, 4, 1], vec![Activation::Sigmoid, Activation::Sigmoid]);
+    let mut rnet = RNet::new(vec![4, 4, 1], vec![Activation::Sigmoid, Activation::Sigmoid], UseCase::Default);
     let train_inputs = vec![
         arr1(&[0.0, 0.0, 0.0, 0.0]),
         arr1(&[1.0, 0.0, 0.0, 0.0]),
@@ -47,8 +47,4 @@ fn main() {
     let test_data = Dataset::new(test_inputs, test_targets);
     let mse = rnet.mean_squared_error(&test_data);
     println!("Mean Squared Error on Test Data: {}", mse);
-    println!("Final layer weights: {:?}", rnet.network.layers.last().unwrap().weights);
-    println!("Final layer biases: {:?}", rnet.network.layers.last().unwrap().bias);
-    println!("Hidden layer weights: {:?}", rnet.network.layers[0].weights);
-    println!("Hidden layer biases: {:?}", rnet.network.layers[0].bias);
 }

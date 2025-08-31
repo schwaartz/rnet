@@ -3,9 +3,13 @@ use ndarray::Array1;
 /// An enum representing different types of activation functions
 #[derive(Debug, Clone, Copy)]
 pub enum Activation {
+    /// The sigmoid activation function
     Sigmoid,
+    /// The hyperbolic tangent activation function
     Tanh,
+    /// The rectified linear unit activation function
     ReLu,
+    /// No activation function (linear)
     None,
 }
 
