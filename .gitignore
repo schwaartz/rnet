@@ -24,3 +24,7 @@ target
 # Added by cargo
 
 /target
+
+# The contents of the data directory
+
+/data
