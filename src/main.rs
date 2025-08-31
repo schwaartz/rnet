@@ -38,9 +38,10 @@ fn main() {
     let dataset = Dataset::new(images, labels);
     let (train_dataset, test_dataset) = dataset.split(0.8);
 
-    let mut rnet = RNet::new(vec![28*28, 128, 10], vec![Activation::Sigmoid, Activation::Sigmoid], UseCase::Classification);
+    let activations = vec![Activation::ReLu, Activation::ReLu, Activation::None]; // The last layer will get softmaxed anyways
+    let mut rnet = RNet::new(vec![28*28, 128, 10], activations, UseCase::Classification);
     rnet.set_learning_rate(0.1);
-    rnet.set_epochs(1);
+    rnet.set_epochs(10);
     rnet.set_batch_size(32);
     rnet.train(&train_dataset);
 

@@ -1,4 +1,5 @@
 use ndarray::{Array1, Array2};
+use crate::rnet::activation::Activation;
 use crate::rnet::layer::Layer;
 use crate::rnet::loss::Loss;
 use crate::rnet::data::Dataset;
@@ -9,12 +10,18 @@ pub struct Network {
     pub input_dim: usize,
     pub layers: Vec<Layer>,
     pub loss: Loss,
+    pub first_layer_activation: Activation
 }
 
 impl Network {
     /// Creates a new Network
-    pub fn new(input_dim: usize, layers: Vec<Layer>, loss: Loss) -> Self {
-        Network { input_dim, layers, loss }
+    pub fn new(
+        input_dim: usize,
+        layers: Vec<Layer>,
+        loss: Loss,
+        first_layer_activation: Activation
+    ) -> Self {
+        Network { input_dim, layers, loss, first_layer_activation }
     }
 
     /// Calculates the output of the network given an input vector.
@@ -23,6 +30,7 @@ impl Network {
         assert!(input.len() == self.input_dim);
 
         let mut output = input.clone();
+        output = output.mapv(|x| self.first_layer_activation.func(x));
         for layer in &self.layers {
             output = layer.calculate_output(&output);
         }
@@ -156,7 +164,7 @@ impl Network {
         a: &Vec<Array1<f64>>,
         z: &Vec<Array1<f64>>,
         grad_a: &Array1<f64>,
-        input: &Array1<f64>,
+        input_z: &Array1<f64>,
     ) -> Array2<f64> {
         let layer = &self.layers[l];
         let mut grad_w = Array2::<f64>::zeros(layer.weights.dim());
@@ -165,7 +173,8 @@ impl Network {
                 grad_w[[j, k]] = if l > 0 {
                     a[l-1][k] * layer.activation.derivative(z[l][j]) * grad_a[j]
                 } else {
-                    input[k] * layer.activation.derivative(z[l][j]) * grad_a[j]
+                    let input_a_k = self.first_layer_activation.func(input_z[k]);
+                    input_a_k * layer.activation.derivative(z[l][j]) * grad_a[j]
                 };
             }
         }
@@ -219,7 +228,7 @@ mod tests {
             arr2(&[[1.0, 0.0], [0.0, 1.0]]),
         );
         let layer2 = layer1.clone();
-        let network = Network::new(2, vec![layer1, layer2], Loss::MSE);
+        let network = Network::new(2, vec![layer1, layer2], Loss::MSE, Activation::None);
 
         // Test the forward propagation
         let input = arr1(&[1.0, 1.0]);
@@ -236,7 +245,7 @@ mod tests {
             arr1(&[0.0]),
             arr2(&[[1.0, 1.0]]),
         );
-        let mut network = Network::new(2, vec![layer1], Loss::MSE);
+        let mut network = Network::new(2, vec![layer1], Loss::MSE, Activation::None);
 
         // Create all possible input combinations for the AND gate
         // replicating the one with output one three times to

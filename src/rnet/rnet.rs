@@ -1,3 +1,7 @@
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Read, Write};
+use std::error::Error;
+
 use crate::rnet::activation::Activation;
 use crate::rnet::activation::OutputActivation;
 use crate::rnet::network::Network;
@@ -43,7 +47,7 @@ impl RNet {
     /// and the output activation functions are chosen based on the use case.
     pub fn new(shape: Vec<usize>, activations: Vec<Activation>, use_case: UseCase) -> Self {
         assert!(shape.len() >= 2);
-        assert!(shape.len() == activations.len() + 1);
+        assert!(shape.len() == activations.len());
         for dim in shape.iter() {
             assert!(*dim > 0);
         }
@@ -53,7 +57,7 @@ impl RNet {
         for i in 1..shape.len() {
             layers.push(Layer::new(
                 shape[i],
-                activations[i - 1],
+                activations[i],
                 Self::rand_bias(shape[i]),
                 Self::rand_weights(shape[i], shape[i - 1]),
             ));
@@ -72,7 +76,7 @@ impl RNet {
         };
 
         RNet {
-            network: Network::new(shape[0], layers, loss),
+            network: Network::new(shape[0], layers, loss, *activations.first().unwrap()),
             learning_rate: DEFAULT_LEARNING_RATE,
             batch_size: DEFAULT_BATCH_SIZE,
             epochs: DEFAULT_EPOCHS,
@@ -145,6 +149,28 @@ impl RNet {
         correct_predictions as f64 / total_predictions as f64
     }
 
+    /// Saves the RNnet weights to a file
+    pub fn save_weights(&self, file_path: &str) -> Result<(), Box<dyn Error>> {
+        let file = File::create(file_path)?;
+        let mut writer = BufWriter::new(file);
+        for (i, layer) in self.network.layers.iter().enumerate() {
+            writeln!(writer, "\n Layer {}, Activation {:?}", i, layer.activation)?;
+            writeln!(writer, "Biases:")?;
+            for b in layer.bias.iter() {
+                writeln!(writer, "B {}", b)?;
+            }
+            writeln!(writer, "Weights:")?;
+            for row in 0..layer.weights.nrows() {
+                let row_str = layer.weights.row(row).iter()
+                    .map(|w| w.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                writeln!(writer, "W {}", row_str)?;
+            }
+        };
+        Ok(())
+    }
+
     /// Generates a random bias vector
     fn rand_bias(size: usize) -> Array1<f64> {
         let mut rng = StdRng::seed_from_u64(RANDSEED);
@@ -157,3 +183,4 @@ impl RNet {
         Array2::from_shape_fn((rows, cols), |_| rng.random_range(-1.0..1.0))
     }
 }
+
