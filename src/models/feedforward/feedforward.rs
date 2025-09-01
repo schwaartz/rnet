@@ -41,6 +41,15 @@ impl FeedForward {
         instance
     }
 
+    /// Predicts the output for a given input
+    pub fn predict(&self, input: &Array1<f32>) -> Array1<f32> {
+        let mut current_output = self.input_layer.compute_output(input);
+        for layer in &self.hidden_layers {
+            current_output = layer.compute_output(&current_output);
+        }
+        self.output_layer.compute_output(&current_output)
+    }
+
     /// Initializes the weights and biases as random matrices and vectors
     fn initialize_weights_and_biases(&mut self) {
         // Initialize the hidden layers
@@ -113,5 +122,25 @@ mod tests {
         assert_eq!(model.hidden_layers[0].weights.as_ref().unwrap().shape(), &[4, 3]);
         assert_eq!(model.hidden_layers[1].weights.as_ref().unwrap().shape(), &[5, 4]);
         assert_eq!(model.output_layer.weights.as_ref().unwrap().shape(), &[2, 5]);
+    }
+
+    /// Tests the forward pass of the network
+    #[test]
+    fn test_predict() {
+        let model = FeedForward::new(
+            InputLayer::new(3),
+            Vec::<HiddenLayer>::new(),
+            OutputLayer::new(2, Box::new(Linear)),
+            Box::new(CrossEntropy),
+        );
+
+        let input = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let output = model.predict(&input);
+
+        let w = model.output_layer.weights.as_ref().unwrap();
+        let b = model.output_layer.biases.as_ref().unwrap();
+        let expected = w.dot(&input) + b;
+
+        assert_eq!(output, expected);
     }
 }
