@@ -13,7 +13,18 @@ pub struct Dataset {
 impl Dataset {
     /// Creates a new Dataset by consuming the input and output data vectors
     pub fn new(inputs: Vec<Array1<f32>>, outputs: Vec<Array1<f32>>) -> Self {
+        assert!(
+            inputs.len() == outputs.len(),
+            "Input and output vectors must have the same length ({} != {})",
+            inputs.len(),
+            outputs.len(),
+        );
         Self { inputs, outputs }
+    }
+
+    /// Returns the number of samples in the dataset
+    pub fn len(&self) -> usize {
+        self.inputs.len()
     }
 
     /// Returns a regular iterator over all the inputs and outputs
@@ -93,7 +104,7 @@ mod tests {
     #[test]
     fn test_random_iterator_batches() {
         let dataset = create_sample_dataset();
-        let mut batches: Vec<_> = dataset.random_iterator(2).collect();
+        let batches: Vec<_> = dataset.random_iterator(2).collect();
 
         // There should be 2 batches (4 elements, batch size 2)
         assert_eq!(batches.len(), 2);
@@ -103,7 +114,7 @@ mod tests {
     #[test]
     fn test_random_iterator_last_batch_smaller() {
         let dataset = create_sample_dataset();
-        let mut batches: Vec<_> = dataset.random_iterator(3).collect();
+        let batches: Vec<_> = dataset.random_iterator(3).collect();
 
         // 4 elements, batch size 3 => 2 batches (3 + 1)
         assert_eq!(batches.len(), 2);
@@ -134,9 +145,23 @@ mod tests {
     }
 
     #[test]
+    fn test_len() {
+        let dataset = create_sample_dataset();
+        assert_eq!(dataset.len(), 4);
+    }
+
+    #[test]
     #[should_panic(expected = "Ratio (1) must be a part of the open interval (0.0, 1.0)")]
     fn test_split_invalid_ratio() {
         let dataset = create_sample_dataset();
         dataset.split(1.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Input and output vectors must have the same length (2 != 3)")]
+    fn test_dataset_mismatch() {
+        let inputs = vec![array![1.0, 2.0], array![3.0, 4.0]];
+        let outputs = vec![array![10.0], array![20.0], array![30.0]];
+        Dataset::new(inputs, outputs);
     }
 }
