@@ -13,12 +13,7 @@ pub struct Dataset {
 impl Dataset {
     /// Creates a new Dataset by consuming the input and output data vectors
     pub fn new(inputs: Vec<Array1<f32>>, outputs: Vec<Array1<f32>>) -> Self {
-        assert!(
-            inputs.len() == outputs.len(),
-            "Input and output vectors must have the same length ({} != {})",
-            inputs.len(),
-            outputs.len(),
-        );
+        assert_eq!(inputs.len(), outputs.len(), "Input and output vectors must have the same length");
         Self { inputs, outputs }
     }
 
@@ -158,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Input and output vectors must have the same length (2 != 3)")]
+    #[should_panic(expected = "Input and output vectors must have the same length")]
     fn test_dataset_mismatch() {
         let inputs = vec![array![1.0, 2.0], array![3.0, 4.0]];
         let outputs = vec![array![10.0], array![20.0], array![30.0]];

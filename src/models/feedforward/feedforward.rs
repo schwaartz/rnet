@@ -1,6 +1,6 @@
 use ndarray::{Array1, Array2};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use crate::{dataset::Dataset, loss::Loss, models::{feedforward::hidden_layer::HiddenLayer, InputLayer, OutputLayer}};
+use crate::{activation, dataset::Dataset, loss::Loss, models::{feedforward::hidden_layer::HiddenLayer, InputLayer, OutputLayer}};
 use chrono::Utc;
 
 const RANDSEED: u64 = 0;
@@ -90,14 +90,132 @@ impl FeedForward {
     }
 
     /// Performs the backpropagation algorithm on a single input/output pair
-    fn backprop(&mut self, input: &Array1<f32>, output: &Array1<f32>) {
-        assert!(input.len() == output.len(), "Input length ({}) must match output length ({})", input.len(), output.len());
-        let gradient = self.calculate_gradient(input, output);
-        unimplemented!()
+    fn backprop(&mut self, input: &Array1<f32>, target: &Array1<f32>) {
+        assert_eq!(input.len(), self.input_layer.dim, "Input length must match input layer dimension");
+        assert_eq!(target.len(), self.output_layer.dim, "Target length must match output layer dimension");
+        
+        let gradient = self.calculate_gradient(input, target);
+        assert_eq!(gradient.len(), self.hidden_layers.len() + 1, "Gradient length must match number of hidden layers + 1");
+
+        // Update all the weights and biases in the hidden layers and the output layer
+        for l in 0..self.hidden_layers.len() {
+            let (weight_grad, bias_grad) = gradient[l].clone();
+            self.hidden_layers[l].weights = Some(weight_grad);
+            self.hidden_layers[l].biases = Some(bias_grad);
+        }
+        self.output_layer.weights = Some(gradient.last().unwrap().0.clone());
+        self.output_layer.biases = Some(gradient.last().unwrap().1.clone());
     }
 
-    fn calculate_gradient(&self, input: &Array1<f32>, output: &Array1<f32>) -> Vec<(Array1<f32>, Array2<f32>)> {
-        unimplemented!()
+    /// Calculates the gradient for each of the layers of the network (excluding
+    /// the input layer, because it has not weights or biases) in the format
+    /// Vec<(Array2<f32>, Array1<f32>)> where every first entry of the tuple are
+    /// the partial derivatives of the weights and the second entry of the tuple
+    /// are the partial derivatives of the biases.
+    fn calculate_gradient(&self, input: &Array1<f32>, target: &Array1<f32>) -> Vec<(Array2<f32>, Array1<f32>)> {
+        // We calculate the output and store all the intermediate results before
+        // applying the activation functions.
+        let (a, z) = self.calculate_a_and_z(input);
+
+        // The variable we will be returning
+        let mut gradient = Vec::<(Array2<f32>, Array1<f32>)>::new();
+
+        // Now we compute $\partial C / \partial a^{(L)}$
+        // with C the cost/loss function and L the final layer
+        let output = a.last().unwrap();
+        let mut grad_a: Array1<f32> = self.loss.compute_gradient(output, target);
+
+        // Now we loop through each of the layers backwards, excluding the input layer
+        for l in (1..self.hidden_layers.len() + 2).rev() { // Includes the output layer
+            // Calculation of the gradient for weights: $\partial C / \partial w_{jk}^{(l)}$
+            // and of the gradient for the biases: $\partial C / \partial b^{(l)}$
+            let grad_w_l = self.calculate_weight_gradient(l, &a, &z, &grad_a);
+            let grad_b_l = self.calculate_bias_gradient(l, &z, &grad_a);
+            gradient.push((grad_w_l, grad_b_l));
+
+            // Calculation of the new gradient of the activations: $\partial C / \partial a^{(l)}$
+            if l > 1 {
+                grad_a = self.calculate_a_gradient(l - 1, &z, &grad_a);
+            }
+        }
+
+        gradient.reverse();
+        gradient
+    }
+
+    /// Private function to help calculate the a and z vectors for every layer.
+    /// So this function performs the forward step of the backpropagation algorithm.
+    fn calculate_a_and_z(&self, input: &Array1<f32>) -> (Vec<Array1<f32>>, Vec<Array1<f32>>) {
+        let mut z = Vec::<Array1<f32>>::new();
+        let mut a = Vec::<Array1<f32>>::new();
+
+        // Input layer
+        z.push(input.clone());
+        let mut curr_output = self.input_layer.compute_output(input);
+        a.push(curr_output.clone());
+
+        // Hidden layers
+        for layer in &self.hidden_layers {
+            let z_l = layer.compute_logits(&curr_output);
+            curr_output = layer.activation.compute_value(&z_l);
+            a.push(curr_output.clone());
+            z.push(z_l);
+        }
+
+        // Output layer
+        let z_output_layer = self.output_layer.compute_logits(&curr_output);
+        a.push(self.output_layer.activation.compute_value(&z_output_layer));
+        z.push(z_output_layer);
+        (a, z)
+    } 
+
+    /// Private function to help calculate the weight gradient for a given layer.
+    /// This function computes $\partial C / \partial w^{(l)}$.
+    fn calculate_weight_gradient(
+        &self,
+        l: usize,
+        a: &Vec<Array1<f32>>,
+        z: &Vec<Array1<f32>>,
+        grad_a: &Array1<f32>,
+    ) -> Array2<f32> {
+        let layer = if l < self.hidden_layers.len() + 1 {
+            &self.hidden_layers[l - 1]
+        } else {
+            &self.output_layer
+        };
+        let activation_deriv = &layer.activation.compute_derivative(&z[l]);
+
+        // $(\sigma'(z^{(l)}) \odot \partial C / \partial a^{(l)}) \cdot a^{(l-1) T}$
+        let col_vec = (activation_deriv * grad_a).insert_axis(ndarray::Axis(1));
+        let row_vec = a[l - 1].clone().insert_axis(ndarray::Axis(0));
+        col_vec.dot(&row_vec)
+    }
+
+    /// Private function to help calculate the bias gradient for a given layer.
+    /// This function computes $\partial C / \partial b^{(l)}$.
+    fn calculate_bias_gradient(&self, l: usize, z: &Vec<Array1<f32>>, grad_a: &Array1<f32>) -> Array1<f32> {
+        let layer = if l < self.hidden_layers.len() + 1 {
+            &self.hidden_layers[l - 1]
+        } else {
+            &self.output_layer
+        };
+
+        // $\partial C / \partial b^{(l)} = \sigma'(z^{(l)}) \odot \partial C / \partial a^{(l)}$
+        grad_a * &layer.activation.compute_derivative(&z[l])
+    }
+
+    /// Private function to help calculate the new a gradient for a given layer.
+    /// This function computes $\partial C / \partial a^{(l)}$ using the chain rule.
+    fn calculate_a_gradient(&self, l: usize, z: &Vec<Array1<f32>>, grad_a: &Array1<f32>) -> Array1<f32> {
+        let layer = if l < self.hidden_layers.len() + 1 {
+            &self.hidden_layers[l - 1]
+        } else {
+            &self.output_layer
+        };
+        
+        let weights = layer.weights.as_ref().unwrap();
+        let activation_deriv = &layer.activation.compute_derivative(&z[l]);
+        weights.t().dot(&(activation_deriv * grad_a))   
     }
 
     /// Initializes the weights and biases as random matrices and vectors
