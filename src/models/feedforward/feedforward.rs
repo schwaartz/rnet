@@ -1,6 +1,6 @@
 use ndarray::{Array1, Array2};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use crate::{activation, dataset::Dataset, loss::Loss, models::{feedforward::hidden_layer::HiddenLayer, InputLayer, OutputLayer}};
+use crate::{dataset::Dataset, loss::Loss, models::{feedforward::hidden_layer::HiddenLayer, InputLayer, OutputLayer}};
 use chrono::Utc;
 
 const RANDSEED: u64 = 0;
@@ -14,7 +14,8 @@ pub struct FeedForward {
     hidden_layers: Vec<HiddenLayer>,
     output_layer: OutputLayer,
     loss: Box<dyn Loss>,
-    
+    randseed: u64,
+
     // Learning parameters
     learning_rate: f32,
     batch_size: usize,
@@ -39,6 +40,7 @@ impl FeedForward {
             batch_size: DEFAULT_BATCH_SIZE,
             epochs: DEFAULT_EPOCHS,
             verbose: false,
+            randseed: RANDSEED,
         };
         instance.initialize_weights_and_biases();
         instance
@@ -57,6 +59,11 @@ impl FeedForward {
     /// Sets the number of epochs for training
     pub fn set_epochs(&mut self, epochs: usize) {
         self.epochs = epochs;
+    }
+
+    /// Sets the random seed for weight initialization
+    pub fn set_randseed(&mut self, rand_seed: u64) {
+        self.randseed = rand_seed;
     }
 
     /// Sets the verbosity of the training process
@@ -90,7 +97,7 @@ impl FeedForward {
     }
 
     /// Performs the backpropagation algorithm on a single input/output pair
-    fn backprop(&mut self, input: &Array1<f32>, target: &Array1<f32>) {
+    pub fn backprop(&mut self, input: &Array1<f32>, target: &Array1<f32>) {
         assert_eq!(input.len(), self.input_layer.dim, "Input length must match input layer dimension");
         assert_eq!(target.len(), self.output_layer.dim, "Target length must match output layer dimension");
         
@@ -100,11 +107,22 @@ impl FeedForward {
         // Update all the weights and biases in the hidden layers and the output layer
         for l in 0..self.hidden_layers.len() {
             let (weight_grad, bias_grad) = gradient[l].clone();
-            self.hidden_layers[l].weights = Some(weight_grad);
-            self.hidden_layers[l].biases = Some(bias_grad);
+            let old_w = self.hidden_layers[l].weights.as_ref().unwrap();
+            let old_b = self.hidden_layers[l].biases.as_ref().unwrap();
+            let new_w = old_w - weight_grad * self.learning_rate;
+            let new_b = old_b - bias_grad * self.learning_rate;
+            self.hidden_layers[l].weights = Some(new_w);
+            self.hidden_layers[l].biases = Some(new_b);
         }
-        self.output_layer.weights = Some(gradient.last().unwrap().0.clone());
-        self.output_layer.biases = Some(gradient.last().unwrap().1.clone());
+        
+        // Update the output layer
+        let (weight_grad, bias_grad) = gradient.last().unwrap().clone();
+        let old_w = self.output_layer.weights.as_ref().unwrap();
+        let old_b = self.output_layer.biases.as_ref().unwrap();
+        let new_w = old_w - weight_grad * self.learning_rate;
+        let new_b = old_b - bias_grad * self.learning_rate;
+        self.output_layer.weights = Some(new_w);
+        self.output_layer.biases = Some(new_b);
     }
 
     /// Calculates the gradient for each of the layers of the network (excluding
@@ -127,16 +145,15 @@ impl FeedForward {
 
         // Now we loop through each of the layers backwards, excluding the input layer
         for l in (1..self.hidden_layers.len() + 2).rev() { // Includes the output layer
-            // Calculation of the gradient for weights: $\partial C / \partial w_{jk}^{(l)}$
-            // and of the gradient for the biases: $\partial C / \partial b^{(l)}$
+            // Calculation of the gradient for activations $\partial C / \partial a^{(l)}$,
+            // the gradient for the weights $\partial C / \partial w^{(l)}$ and the gradient
+            // of the biases: $\partial C / \partial b^{(l)}$
             let grad_w_l = self.calculate_weight_gradient(l, &a, &z, &grad_a);
             let grad_b_l = self.calculate_bias_gradient(l, &z, &grad_a);
-            gradient.push((grad_w_l, grad_b_l));
-
-            // Calculation of the new gradient of the activations: $\partial C / \partial a^{(l)}$
             if l > 1 {
                 grad_a = self.calculate_a_gradient(l - 1, &z, &grad_a);
             }
+            gradient.push((grad_w_l, grad_b_l));
         }
 
         gradient.reverse();
@@ -207,15 +224,17 @@ impl FeedForward {
     /// Private function to help calculate the new a gradient for a given layer.
     /// This function computes $\partial C / \partial a^{(l)}$ using the chain rule.
     fn calculate_a_gradient(&self, l: usize, z: &Vec<Array1<f32>>, grad_a: &Array1<f32>) -> Array1<f32> {
-        let layer = if l < self.hidden_layers.len() + 1 {
-            &self.hidden_layers[l - 1]
+        let next_layer = if l >= self.hidden_layers.len() {
+            &self.output_layer // layer l + 1
         } else {
-            &self.output_layer
+            &self.hidden_layers[l] // layer l + 1
         };
-        
-        let weights = layer.weights.as_ref().unwrap();
-        let activation_deriv = &layer.activation.compute_derivative(&z[l]);
-        weights.t().dot(&(activation_deriv * grad_a))   
+
+        // $\partial C / \partial a^{(l)} = (W^{(l+1)})^T \cdot (\sigma'(z^{(l+1)}) \odot \partial C / \partial a^{(l+1)})$
+        let weights = next_layer.weights.as_ref().unwrap();
+        let weights_t = weights.clone().reversed_axes(); // Transposes the array
+        let activation_deriv = &next_layer.activation.compute_derivative(&z[l + 1]);
+        weights_t.dot(&(activation_deriv * grad_a))   
     }
 
     /// Initializes the weights and biases as random matrices and vectors
@@ -227,34 +246,34 @@ impl FeedForward {
             } else {
                 (self.hidden_layers[l].dim, self.hidden_layers[l - 1].dim)
             };
-            self.hidden_layers[l].weights = Some(Self::rand_weights(rows, cols));
-            self.hidden_layers[l].biases = Some(Self::rand_bias(rows));
+            self.hidden_layers[l].weights = Some(self.rand_weights(rows, cols));
+            self.hidden_layers[l].biases = Some(self.rand_bias(rows));
         }
 
         // Initialize the output layer
-        self.output_layer.biases = Some(Self::rand_bias(self.output_layer.dim));
+        self.output_layer.biases = Some(self.rand_bias(self.output_layer.dim));
         if self.hidden_layers.is_empty() {
-            self.output_layer.weights = Some(Self::rand_weights(
+            self.output_layer.weights = Some(self.rand_weights(
                 self.output_layer.dim,
                 self.input_layer.dim,
             ));
         } else {
-            self.output_layer.weights = Some(Self::rand_weights(
+            self.output_layer.weights = Some(self.rand_weights(
                 self.output_layer.dim,
                 self.hidden_layers.last().unwrap().dim,
             ));
         }
     }
 
-    /// Generates a random bias vector
-    fn rand_bias(size: usize) -> Array1<f32> {
-        let mut rng = StdRng::seed_from_u64(RANDSEED);
+    /// Generates a random bias
+    fn rand_bias(&self, size: usize) -> Array1<f32> {
+        let mut rng = StdRng::seed_from_u64(self.randseed);
         Array1::from_shape_fn(size, |_| rng.random_range(-1.0..1.0))
     }
 
     /// Generates a random weight matrix
-    fn rand_weights(rows: usize, cols: usize) -> Array2<f32> {
-        let mut rng = StdRng::seed_from_u64(RANDSEED);
+    fn rand_weights(&self, rows: usize, cols: usize) -> Array2<f32> {
+        let mut rng = StdRng::seed_from_u64(self.randseed);
         Array2::from_shape_fn((rows, cols), |_| rng.random_range(-1.0..1.0))
     }
 
@@ -280,7 +299,8 @@ impl FeedForward {
 
 #[cfg(test)]
 mod tests {
-    use crate::{activation::{Linear}, loss::CrossEntropy};
+    use crate::{activation::{Linear, Softmax}, loss::CrossEntropy};
+    use crate::dataset::Dataset;
     use super::*;
 
     #[test]
@@ -329,5 +349,49 @@ mod tests {
         let expected = w.dot(&input) + b;
 
         assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_backward_pass() {
+        let mut model = FeedForward::new(
+            InputLayer::new(3),
+            vec![HiddenLayer::new(4, Box::new(Linear))],
+            OutputLayer::new(2, Box::new(Softmax)),
+            Box::new(CrossEntropy),
+        );
+        model.set_randseed(0);
+        model.set_learning_rate(0.1);
+
+        let input = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let target = Array1::from_vec(vec![0.0, 1.0]);
+        let old_loss = model.loss.compute_value(&model.predict(&input), &target);
+        for _ in 0..10 {
+            model.backprop(&input, &target);
+        }
+        let new_loss = model.loss.compute_value(&model.predict(&input), &target);
+
+        assert!(old_loss > new_loss);
+    }
+
+    #[test]
+    fn test_train() {
+        let mut model = FeedForward::new(
+            InputLayer::new(3),
+            vec![HiddenLayer::new(4, Box::new(Linear))],
+            OutputLayer::new(2, Box::new(Softmax)),
+            Box::new(CrossEntropy),
+        );
+        model.set_randseed(0);
+        model.set_learning_rate(0.1);
+        model.set_epochs(10);
+
+        let input = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let target = Array1::from_vec(vec![0.0, 1.0]);
+        let old_loss = model.loss.compute_value(&model.predict(&input), &target);
+        let dataset = Dataset::new(vec![input.clone()], vec![target.clone()]);
+        model.train(&dataset);
+        let new_loss = model.loss.compute_value(&model.predict(&input), &target);
+
+        assert!(old_loss > new_loss);
     }
 }
