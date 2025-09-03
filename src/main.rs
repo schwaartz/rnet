@@ -35,8 +35,7 @@ fn main() {
     let mut ffn = FeedForward::new(
         InputLayer::new(28 * 28),
         vec![
-            HiddenLayer::new(128, Box::new(Sigmoid)),
-            HiddenLayer::new(64, Box::new(Sigmoid)),
+            HiddenLayer::new(128, Box::new(ReLU)),
         ],
         OutputLayer::new(10, Box::new(Softmax)),
         Box::new(CrossEntropy),

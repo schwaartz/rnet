@@ -7,6 +7,7 @@ const RANDSEED: u64 = 0;
 const DEFAULT_LEARNING_RATE: f32 = 0.1;
 const DEFAULT_BATCH_SIZE: usize = 32;
 const DEFAULT_EPOCHS: usize = 10;
+const GRADIENT_CLIP: f32 = 5.0;
 
 /// A representation of a feedforward neural network
 pub struct FeedForward {
@@ -17,6 +18,7 @@ pub struct FeedForward {
     pub randseed: u64,
 
     // Learning parameters
+    pub gradient_clip: f32,
     pub learning_rate: f32,
     pub batch_size: usize,
     pub epochs: usize,
@@ -41,6 +43,7 @@ impl FeedForward {
             epochs: DEFAULT_EPOCHS,
             verbose: false,
             randseed: RANDSEED,
+            gradient_clip: GRADIENT_CLIP,
         };
         instance.initialize_weights_and_biases();
         instance
@@ -69,6 +72,11 @@ impl FeedForward {
     /// Sets the verbosity of the training process
     pub fn set_verbose(&mut self, verbose: bool) {
         self.verbose = verbose;
+    }
+
+    /// Sets the gradient clipping value
+    pub fn set_gradient_clip(&mut self, gradient_clip: f32) {
+        self.gradient_clip = gradient_clip;
     }
 
     /// Predicts the output for a given input
@@ -194,7 +202,26 @@ impl FeedForward {
         }
 
         gradient.reverse();
+        self.clip_gradient(&mut gradient);
         gradient
+    }
+
+    /// Private method that clips the gradient when it goes out of bounds.
+    /// This prevents the exploding gradient problem.
+    fn clip_gradient(&self, gradient: &mut Vec<(Array2<f32>, Array1<f32>)>) {
+        let mut norm: f32 = 0.0;
+        for (grad_w, grad_b) in gradient.iter() {
+            norm += grad_w.mapv(|x| x.powi(2)).sum();
+            norm += grad_b.mapv(|x| x.powi(2)).sum();
+        }
+        norm = norm.sqrt();
+        if norm > self.gradient_clip {
+            let scale = self.gradient_clip / norm;
+            for (grad_w, grad_b) in gradient.iter_mut() {
+                grad_w.mapv_inplace(|x| x * scale);
+                grad_b.mapv_inplace(|x| x * scale);
+            }
+        }
     }
 
     /// Private function to help calculate the a and z vectors for every layer.
