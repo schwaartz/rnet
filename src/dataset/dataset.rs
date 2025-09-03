@@ -23,13 +23,13 @@ impl Dataset {
     }
 
     /// Returns a regular iterator over all the inputs and outputs
-    pub fn iterator(&self) -> impl Iterator<Item = (&Array1<f32>, &Array1<f32>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Array1<f32>, &Array1<f32>)> {
         self.inputs.iter().zip(self.outputs.iter())
     }
 
     /// Returns an iterator over random batches from the dataset with the given size.
     /// The last elements are returned in a batch that is possibly smaller.
-    pub fn random_iterator(&self, batch_size: usize) -> impl Iterator<Item = Vec<(&Array1<f32>, &Array1<f32>)>> {
+    pub fn rand_iter(&self, batch_size: usize) -> impl Iterator<Item = Vec<(&Array1<f32>, &Array1<f32>)>> {
         let mut rng = StdRng::seed_from_u64(RANDSEED);
         let mut indices: Vec<usize> = (0..self.inputs.len()).collect();
         indices.shuffle(&mut rng);
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn test_iterator() {
         let dataset = create_sample_dataset();
-        let pairs: Vec<_> = dataset.iterator().collect();
+        let pairs: Vec<_> = dataset.iter().collect();
         assert_eq!(pairs.len(), 4);
         assert_eq!(pairs[0].0, &array![1.0, 2.0]);
         assert_eq!(pairs[0].1, &array![10.0]);
@@ -99,7 +99,7 @@ mod tests {
     #[test]
     fn test_random_iterator_batches() {
         let dataset = create_sample_dataset();
-        let batches: Vec<_> = dataset.random_iterator(2).collect();
+        let batches: Vec<_> = dataset.rand_iter(2).collect();
 
         // There should be 2 batches (4 elements, batch size 2)
         assert_eq!(batches.len(), 2);
@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn test_random_iterator_last_batch_smaller() {
         let dataset = create_sample_dataset();
-        let batches: Vec<_> = dataset.random_iterator(3).collect();
+        let batches: Vec<_> = dataset.rand_iter(3).collect();
 
         // 4 elements, batch size 3 => 2 batches (3 + 1)
         assert_eq!(batches.len(), 2);

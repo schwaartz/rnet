@@ -10,17 +10,17 @@ const DEFAULT_EPOCHS: usize = 10;
 
 /// A representation of a feedforward neural network
 pub struct FeedForward {
-    input_layer: InputLayer,
-    hidden_layers: Vec<HiddenLayer>,
-    output_layer: OutputLayer,
-    loss: Box<dyn Loss>,
-    randseed: u64,
+    pub input_layer: InputLayer,
+    pub hidden_layers: Vec<HiddenLayer>,
+    pub output_layer: OutputLayer,
+    pub loss: Box<dyn Loss>,
+    pub randseed: u64,
 
     // Learning parameters
-    learning_rate: f32,
-    batch_size: usize,
-    epochs: usize,
-    verbose: bool,
+    pub learning_rate: f32,
+    pub batch_size: usize,
+    pub epochs: usize,
+    pub verbose: bool,
 }
 
 impl FeedForward {
@@ -80,19 +80,56 @@ impl FeedForward {
         self.output_layer.compute_output(&current_output)
     }
 
+    /// Calculates the accuracy of the model on the given dataset.
+    /// This metric is most useful for classifiers.
+    pub fn accuracy(&self, dataset: &Dataset) -> f32 {
+        assert!(!dataset.inputs.is_empty(), "Dataset must not be empty to calculate accuracy");
+        let get_max = |arr: &Array1<f32>| {
+            let (mut max_i, mut max_val) = (-1, f32::MIN);
+            for (i, val) in arr.iter().enumerate() {
+                if val > &max_val {
+                    (max_i, max_val) = (i as i32, *val)
+                }
+            }
+            max_i
+        };
+        let mut correct = 0;
+        for (input, target) in dataset.iter() {
+            let output = self.predict(input);
+            let predicted_class = get_max(&output);
+            let actual_class = get_max(target);
+            if predicted_class == actual_class {
+                correct += 1;
+            }
+        }
+        correct as f32 / dataset.len() as f32
+    }
+
+    /// Calculates the mean squared error of the model on the given dataset
+    pub fn mse(&self, dataset: &Dataset) -> f32 {
+        assert!(!dataset.inputs.is_empty(), "Dataset must not be empty to calculate MSE");
+        let mut total_error = 0.0;
+        for (input, target) in dataset.iter() {
+            let output = self.predict(input);
+            total_error += (&output - target).pow2().sum();
+        }
+        total_error / dataset.len() as f32
+    }
+
     /// Trains the feedforward network using the provided dataset and the
     /// backpropagation algorithm
     pub fn train(&mut self, dataset: &Dataset) {
         for epoch in 1..=self.epochs {
             self.log(format!("Epoch {}/{} started", epoch, self.epochs));
             let (mut processed, total) = (0, dataset.len());
-            for batch in dataset.random_iterator(self.batch_size) {
+            for batch in dataset.rand_iter(self.batch_size) {
                 self.print_progress_bar(processed, total);
                 processed += batch.len();
                 for (input, output) in batch {
                     self.backprop(input, output); // Could use parallelisation
                 }
             }
+            if self.verbose { println!(""); } // New line after progress bar is finished
         }
     }
 
@@ -268,13 +305,13 @@ impl FeedForward {
     /// Generates a random bias
     fn rand_bias(&self, size: usize) -> Array1<f32> {
         let mut rng = StdRng::seed_from_u64(self.randseed);
-        Array1::from_shape_fn(size, |_| rng.random_range(-1.0..1.0))
+        Array1::from_shape_fn(size, |_| rng.random_range(-0.1..0.1))
     }
 
     /// Generates a random weight matrix
     fn rand_weights(&self, rows: usize, cols: usize) -> Array2<f32> {
         let mut rng = StdRng::seed_from_u64(self.randseed);
-        Array2::from_shape_fn((rows, cols), |_| rng.random_range(-1.0..1.0))
+        Array2::from_shape_fn((rows, cols), |_| rng.random_range(-0.1..0.1))
     }
 
     /// Prints a progress bar to the console of a fixed length if verbosity is enabled
@@ -284,7 +321,7 @@ impl FeedForward {
         }
         let bar_length = 30;
         let progress = (processed as f32 / total as f32 * bar_length as f32).round() as usize;
-        let bar: String = "=".repeat(progress) + ">" + &" ".repeat(bar_length - progress - 1);
+        let bar: String = "=".repeat(progress) + &" ".repeat(bar_length - progress);
         print!("\r[{}] {}/{}", bar, processed, total);
     }
 
@@ -393,5 +430,70 @@ mod tests {
         let new_loss = model.loss.compute_value(&model.predict(&input), &target);
 
         assert!(old_loss > new_loss);
+    }
+
+    #[test]
+    fn test_accuracy() {
+        let model = FeedForward::new(
+            InputLayer::new(3),
+            vec![HiddenLayer::new(4, Box::new(Linear))],
+            OutputLayer::new(2, Box::new(Softmax)),
+            Box::new(CrossEntropy),
+        );
+
+        let input1 = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let input2 = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let target1 = Array1::from_vec(vec![0.0, 1.0]);
+        let target2 = Array1::from_vec(vec![1.0, 0.0]);
+        let dataset = Dataset::new(vec![input1.clone(), input2.clone()], vec![target1.clone(), target2.clone()]);
+        let accuracy = model.accuracy(&dataset);
+        assert_eq!(accuracy, 0.5);
+    }
+
+    #[test]
+    fn test_mse() {
+        let model = FeedForward::new(
+            InputLayer::new(3),
+            vec![HiddenLayer::new(4, Box::new(Linear))],
+            OutputLayer::new(2, Box::new(Softmax)),
+            Box::new(CrossEntropy),
+        );
+
+        let input1 = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let input2 = Array1::from_vec(vec![1.0, 2.0, 3.0]);
+        let target1 = Array1::from_vec(vec![0.0, 1.0]);
+        let target2 = Array1::from_vec(vec![1.0, 0.0]);
+        let output1 = model.predict(&input1);
+        let output2 = model.predict(&input2);
+        let expected_mse = ((output1 - &target1).pow2().sum() + (output2 - &target2).pow2().sum()) / 2.0;
+        let dataset = Dataset::new(vec![input1.clone(), input2.clone()], vec![target1.clone(), target2.clone()]);
+        let output_mse = model.mse(&dataset);
+        assert_eq!(output_mse, expected_mse);
+    }
+
+    #[test] 
+    #[should_panic(expected = "Dataset must not be empty to calculate accuracy")]
+    fn test_empty_accuracy() {
+        let model = FeedForward::new(
+            InputLayer::new(3),
+            vec![HiddenLayer::new(4, Box::new(Linear))],
+            OutputLayer::new(2, Box::new(Softmax)),
+            Box::new(CrossEntropy),
+        );
+        let dataset = Dataset::new(vec![], vec![]);
+        model.accuracy(&dataset);
+    }
+
+    #[test]
+    #[should_panic(expected = "Dataset must not be empty to calculate MSE")]
+    fn test_empty_mse() {
+        let model = FeedForward::new(
+            InputLayer::new(3),
+            vec![HiddenLayer::new(4, Box::new(Linear))],
+            OutputLayer::new(2, Box::new(Softmax)),
+            Box::new(CrossEntropy),
+        );
+        let dataset = Dataset::new(vec![], vec![]);
+        model.mse(&dataset);
     }
 }
