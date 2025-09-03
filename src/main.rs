@@ -29,8 +29,7 @@ fn main() {
             }
         }
     }
-    let mut dataset = Dataset::new(images, labels);
-    dataset = dataset.split(0.1).0; // Only use 10% for speed
+    let dataset = Dataset::new(images, labels);
     let (train_dataset, test_dataset) = dataset.split(0.8);
 
     let mut ffn = FeedForward::new(

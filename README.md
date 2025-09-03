@@ -7,8 +7,16 @@ The library can make simple feedforward networks of any shape and with any set o
 **Example:**
 
 ```rust
-let mut rnet = RNet::new(vec![784, 128, 10], vec![Activation::ReLu, Activation::ReLu, Activation::None], UseCase::Classification);
-rnet.train(&train_dataset);
+let mut ffn = FeedForward::new(
+    InputLayer::new(28 * 28),
+    vec![
+        HiddenLayer::new(128, Box::new(Sigmoid)),
+        HiddenLayer::new(64, Box::new(Sigmoid)),
+    ],
+    OutputLayer::new(10, Box::new(Softmax)),
+    Box::new(CrossEntropy),
+);
+ffn.train(&train_dataset);
 let acc = rnet.accuracy(&test_dataset);
 println!("Test accuracy: {}", acc);
 ```
