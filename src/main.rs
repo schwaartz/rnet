@@ -10,7 +10,7 @@ fn main() {
     let mut labels = Vec::new();
 
     for digit in 0..10 {
-        let train_folder = format!("{}/data/mnist/dataset/{}", std::env::current_dir().unwrap().display(), digit);
+        let train_folder = format!("{}/data/mnist/trainingSet/{}", std::env::current_dir().unwrap().display(), digit);
         println!("Loading data from {}", train_folder);
         for entry in fs::read_dir(&train_folder).unwrap() {
             let entry = entry.unwrap();
@@ -53,6 +53,6 @@ fn main() {
         println!("Layer biases: {:?}", layer.biases);
     }
 
-    println!("Accuracy {}", ffn.accuracy(&test_dataset));
-    println!("Mean Squared Error {}", ffn.mse(&test_dataset));
+    println!("Train Accuracy {}", ffn.accuracy(&test_dataset));
+    println!("Train MSE {}", ffn.mse(&test_dataset));
 }

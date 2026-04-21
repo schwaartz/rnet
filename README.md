@@ -21,4 +21,6 @@ let acc = rnet.accuracy(&test_dataset);
 println!("Test accuracy: {}", acc);
 ```
 
+The dataset that is being used in `main.rs` is the MNIST .jpg dataset, which can be downloaded from [here](https://www.kaggle.com/datasets/scolianni/mnistasjpg).
+
 MIT License
